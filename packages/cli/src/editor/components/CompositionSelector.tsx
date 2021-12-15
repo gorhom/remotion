@@ -1,7 +1,9 @@
-import React, {useCallback, useContext, useEffect} from 'react';
+import React, {useCallback, useContext, useEffect, useMemo} from 'react';
 import {Internals, TComposition} from 'remotion';
+import {TCompositionGroup} from 'remotion/src/CompositionManager';
 import {loadMarks} from '../state/marks';
 import {useZIndex} from '../state/z-index';
+import {CompositionSelectorGroup} from './CompositionSelectorGroup';
 import {CompositionSelectorItem} from './CompositionSelectorItem';
 import {CurrentComposition} from './CurrentComposition';
 import {
@@ -28,6 +30,43 @@ export const CompositionSelector: React.FC = () => {
 	const {compositions, setCurrentComposition, currentComposition} = useContext(
 		Internals.CompositionManager
 	);
+
+	const groupedCompositions = useMemo(
+		() =>
+			compositions.reduce<
+				Array<(TCompositionGroup & {open?: boolean}) | TComposition>
+			>((result, current) => {
+				if (current.id.indexOf('-') === -1) {
+					result.push(current);
+					return result;
+				}
+
+				const compositionId = current.id.split('-').slice();
+				const groupId = compositionId[0];
+				const groupIndex = result.findIndex(
+					(item) => 'groupId' in item && item.groupId === groupId
+				);
+
+				if (groupIndex === -1) {
+					result.push({
+						groupId,
+						compositions: [current],
+						open: currentComposition === current.id,
+					});
+				} else {
+					(result[groupIndex] as TCompositionGroup).compositions.push(current);
+
+					if (currentComposition === current.id) {
+						// @ts-expect-error
+						result[groupIndex].open = true;
+					}
+				}
+
+				return result;
+			}, []),
+		[compositions, currentComposition]
+	);
+
 	const {tabIndex} = useZIndex();
 	const setCurrentFrame = Internals.Timeline.useTimelineSetFrame();
 
@@ -66,8 +105,8 @@ export const CompositionSelector: React.FC = () => {
 		<div style={container}>
 			<CurrentComposition />
 			<div style={list}>
-				{compositions.map((c) => {
-					return (
+				{groupedCompositions.map((c) =>
+					'id' in c ? (
 						<CompositionSelectorItem
 							key={c.id}
 							currentComposition={currentComposition}
@@ -75,8 +114,20 @@ export const CompositionSelector: React.FC = () => {
 							tabIndex={tabIndex}
 							composition={c}
 						/>
-					);
-				})}
+					) : (
+						<CompositionSelectorGroup key={c.groupId} name={c.groupId}>
+							{c.compositions.map((ic) => (
+								<CompositionSelectorItem
+									key={ic.id}
+									currentComposition={currentComposition}
+									selectComposition={selectComposition}
+									tabIndex={tabIndex}
+									composition={ic}
+								/>
+							))}
+						</CompositionSelectorGroup>
+					)
+				)}
 			</div>
 		</div>
 	);

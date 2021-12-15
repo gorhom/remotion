@@ -19,6 +19,11 @@ export type TComposition<T = unknown> = {
 	nonce: number;
 };
 
+export type TCompositionGroup = {
+	groupId: string;
+	compositions: TComposition[];
+};
+
 export type TCompMetadata = Pick<
 	TComposition,
 	'id' | 'height' | 'width' | 'fps' | 'durationInFrames'
